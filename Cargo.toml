@@ -1,0 +1,11 @@
+[package]
+name = "microtime"
+version = "0.1.0"
+authors = ["Cody P Schafer <dev@codyps.com>"]
+edition = "2018"
+license = "Apache-2.0 OR MIT"
+documentation = "https://docs.rs/microtime"
+include = ["Cargo.toml", "src/**/*.rs", "tests/**/*.rs", "README.md"]
+description = "Time tracked in microseconds"
+
+[dependencies]
