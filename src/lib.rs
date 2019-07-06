@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 use std::time;
 
-fn usec_from_duration(duration: time::Duration) -> u64 {
+pub fn usec_from_duration(duration: time::Duration) -> u64 {
     let sub_usecs = (duration.subsec_nanos() / 1000) as u64;
     duration.as_secs() * 1_000_000 + sub_usecs
 }
