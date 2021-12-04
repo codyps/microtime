@@ -1,9 +1,17 @@
-use std::convert::TryFrom;
-use std::time;
+#![cfg_attr(not(feature = "std"), no_std)]
 
-pub fn usec_from_duration(duration: time::Duration) -> u64 {
-    let sub_usecs = (duration.subsec_nanos() / 1000) as u64;
-    duration.as_secs() * 1_000_000 + sub_usecs
+use core::ops::{Add, Sub};
+use core::time;
+
+#[cfg(feature = "std")]
+mod std_time;
+
+#[cfg(feature = "std")]
+pub use std_time::*;
+
+const fn usec_from_duration(duration: time::Duration) -> u64 {
+    let sub_micros = (duration.subsec_nanos() / 1000) as u64;
+    duration.as_secs() * 1_000_000 + sub_micros
 }
 
 fn duration_from_usec(usec: u64) -> time::Duration {
@@ -13,35 +21,54 @@ fn duration_from_usec(usec: u64) -> time::Duration {
     time::Duration::new(secs, sub_nsec)
 }
 
-fn system_time_from_realtime_usec(usec: u64) -> time::SystemTime {
-    let d = duration_from_usec(usec);
-    time::UNIX_EPOCH + d
+const fn seconds_to_micros(seconds: u64) -> u64 {
+    seconds * 1_000_000
 }
 
-fn usec_from_system_time(ts: time::SystemTime) -> u64
-{
-    let d = ts.duration_since(time::UNIX_EPOCH).unwrap();
-    u64::try_from(d.as_micros()).unwrap()
+const fn millis_to_micros(millis: u64) -> u64 {
+    millis * 1_000
 }
 
 /// An instant in monotonic time as provided by a `CLOCK_MONOTONIC` like clock
 ///
 /// Internally, this uses microsecond (usec) sized values to track, giving 584942417355.07202148
 /// years until overflow. Internally, systemd uses the same formatting for it's time values.
-#[derive(Debug,Eq,PartialEq,PartialOrd,Ord,Clone,Copy)]
+#[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Clone, Copy)]
 pub struct MonotonicTime {
-    usecs: u64,
+    micros: u64,
 }
 
 impl MonotonicTime {
+    pub const ZERO: Self = Self { micros: 0 };
+
     /// Create a timestamp from microseconds
-    pub fn from_micros(usecs: u64) -> Self {
-        MonotonicTime { usecs: usecs }
+    pub const fn from_micros(micros: u64) -> Self {
+        MonotonicTime { micros }
     }
 
     /// Return the entire timestamp converted to microseconds
-    pub fn as_micros(&self) -> u64 {
-        self.usecs
+    pub const fn as_micros(&self) -> u64 {
+        self.micros
+    }
+
+    pub const fn from_millis(millis: u64) -> Self {
+        MonotonicTime {
+            micros: millis_to_micros(millis),
+        }
+    }
+
+    pub const fn from_seconds(seconds: u32) -> Self {
+        MonotonicTime {
+            micros: seconds as u64 * 1_000_000,
+        }
+    }
+}
+
+impl Sub<MonotonicTime> for MonotonicTime {
+    type Output = Duration;
+
+    fn sub(self, rhs: MonotonicTime) -> Self::Output {
+        Duration::from_micros(self.micros - rhs.micros)
     }
 }
 
@@ -63,31 +90,45 @@ impl From<time::Duration> for MonotonicTime {
 }
 
 /// A timestamp from a `CLOCK_REALTIME` like clock
-#[derive(Debug,Eq,PartialEq,PartialOrd,Ord,Clone,Copy)]
+#[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Clone, Copy)]
 pub struct RealTime {
-    usecs: u64,
+    micros: u64,
 }
 
 impl RealTime {
-    pub fn from_micros(micros: u64) -> Self
-    {
-        Self { usecs: micros }
-    }
+    pub const ZERO: Self = Self { micros: 0 };
+}
 
-    pub fn as_micros(&self) -> u64
-    {
-        self.usecs
+impl Add<time::Duration> for RealTime {
+    type Output = RealTime;
+
+    fn add(self, other: time::Duration) -> RealTime {
+        let mo: u64 = other.as_micros().try_into().unwrap();
+        RealTime {
+            micros: self.micros + mo,
+        }
     }
 }
 
-impl From<time::SystemTime> for RealTime {
-    fn from(s: time::SystemTime) -> Self {
-        Self::from_micros(usec_from_system_time(s))
-    }
+#[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Clone, Copy)]
+pub struct Duration {
+    micros: u64,
 }
 
-impl From<RealTime> for time::SystemTime {
-    fn from(s: RealTime) -> time::SystemTime {
-        system_time_from_realtime_usec(s.as_micros())
+impl Duration {
+    pub const fn from_micros(micros: u64) -> Self {
+        Duration { micros }
+    }
+
+    pub const fn from_seconds(seconds: u64) -> Self {
+        Duration {
+            micros: seconds_to_micros(seconds),
+        }
+    }
+
+    pub const fn from_milliseconds(millis: u64) -> Self {
+        Duration {
+            micros: millis_to_micros(millis),
+        }
     }
 }

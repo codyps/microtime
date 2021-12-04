@@ -2,7 +2,7 @@
 name = "microtime"
 version = "0.2.0"
 authors = ["Cody P Schafer <dev@codyps.com>"]
-edition = "2018"
+edition = "2021"
 license = "Apache-2.0 OR MIT"
 documentation = "https://docs.rs/microtime"
 include = ["Cargo.toml", "src/**/*.rs", "tests/**/*.rs", "README.md"]
