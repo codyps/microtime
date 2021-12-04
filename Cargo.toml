@@ -8,4 +8,7 @@ documentation = "https://docs.rs/microtime"
 include = ["Cargo.toml", "src/**/*.rs", "tests/**/*.rs", "README.md"]
 description = "Time tracked in microseconds"
 
+[features]
+std = []
+
 [dependencies]

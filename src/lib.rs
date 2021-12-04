@@ -9,15 +9,15 @@ mod std_time;
 #[cfg(feature = "std")]
 pub use std_time::*;
 
-const fn usec_from_duration(duration: time::Duration) -> u64 {
+const fn micros_from_duration(duration: time::Duration) -> u64 {
     let sub_micros = (duration.subsec_nanos() / 1000) as u64;
     duration.as_secs() * 1_000_000 + sub_micros
 }
 
-fn duration_from_usec(usec: u64) -> time::Duration {
-    let secs = usec / 1_000_000;
-    let sub_usec = (usec % 1_000_000) as u32;
-    let sub_nsec = sub_usec * 1000;
+fn duration_from_micros(micros: u64) -> time::Duration {
+    let secs = micros / 1_000_000;
+    let sub_micros = (micros % 1_000_000) as u32;
+    let sub_nsec = sub_micros * 1000;
     time::Duration::new(secs, sub_nsec)
 }
 
@@ -31,7 +31,7 @@ const fn millis_to_micros(millis: u64) -> u64 {
 
 /// An instant in monotonic time as provided by a `CLOCK_MONOTONIC` like clock
 ///
-/// Internally, this uses microsecond (usec) sized values to track, giving 584942417355.07202148
+/// Internally, this uses microsecond (micros) sized values to track, giving 584942417355.07202148
 /// years until overflow. Internally, systemd uses the same formatting for it's time values.
 #[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Clone, Copy)]
 pub struct MonotonicTime {
@@ -79,13 +79,13 @@ impl Sub<MonotonicTime> for MonotonicTime {
 /// this function to obtain a `MonotonicTime` for the timestamp within the `Duration`
 impl From<MonotonicTime> for time::Duration {
     fn from(s: MonotonicTime) -> time::Duration {
-        duration_from_usec(s.as_micros())
+        duration_from_micros(s.as_micros())
     }
 }
 
 impl From<time::Duration> for MonotonicTime {
     fn from(s: time::Duration) -> Self {
-        Self::from_micros(usec_from_duration(s))
+        Self::from_micros(micros_from_duration(s))
     }
 }
 
