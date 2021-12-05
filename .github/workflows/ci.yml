@@ -35,13 +35,13 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: hack
-          args: --feature-powerset build -- --all-targets
+          args: --feature-powerset build --all-targets
 
       - name: Test
         uses: actions-rs/cargo@v1
         with:
           command: hack
-          args: --feature-powerset test -- --all-targets
+          args: --feature-powerset test --all-targets
   check:
     runs-on: ubuntu-latest
 

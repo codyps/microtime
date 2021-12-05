@@ -1,5 +1,5 @@
 status = [
-	"Build and test",
+	"Build and test (beta)",
 	"check",
 ]
 cut_body_after = "---"
