@@ -21,6 +21,8 @@ fn monotonic_duration_round_trip() {
     assert_eq!(us, m_t2.as_micros());
 }
 
+// `Add` isn't const
+/*
 const fn dur_1sec_10micro() -> microtime::Duration {
     microtime::Duration::from_seconds(1) + microtime::Duration::from_micros(10)
 }
@@ -32,3 +34,4 @@ fn const_check() {
         microtime::Duration::from_seconds(1) + microtime::Duration::from_micros(10)
     );
 }
+*/
