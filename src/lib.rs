@@ -145,8 +145,7 @@ fn duration_from_micros(micros: u64) -> time::Duration {
 }
 
 const fn micros_from_duration(duration: time::Duration) -> u64 {
-    let sub_micros = (duration.subsec_nanos() / 1000) as u64;
-    duration.as_secs() * 1_000_000 + sub_micros
+    duration.as_secs() * 1_000_000 + duration.subsec_micros() as u64
 }
 
 impl MonotonicTime {
