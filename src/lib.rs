@@ -2,25 +2,52 @@
 
 use core::ops::{Add, Sub};
 use core::time;
+use core::{fmt, result};
 
 #[cfg(feature = "std")]
 mod std_time;
 
-#[cfg(feature = "std")]
-pub use std_time::*;
-
 const fn seconds_to_micros(seconds: u64) -> u64 {
-    seconds * 1_000_000
+    match checked_seconds_to_micros(seconds) {
+        Some(micros) => micros,
+        None => panic!("seconds do not fit in microseconds"),
+    }
 }
 
 const fn millis_to_micros(millis: u64) -> u64 {
-    millis * 1_000
+    match checked_millis_to_micros(millis) {
+        Some(micros) => micros,
+        None => panic!("milliseconds do not fit in microseconds"),
+    }
 }
+
+const fn checked_seconds_to_micros(seconds: u64) -> Option<u64> {
+    seconds.checked_mul(1_000_000)
+}
+
+const fn checked_millis_to_micros(millis: u64) -> Option<u64> {
+    millis.checked_mul(1_000)
+}
+
+/// A time value is outside the range representable by this crate.
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+pub struct TimeRangeError;
+
+impl fmt::Display for TimeRangeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("time value is outside microtime's representable range")
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for TimeRangeError {}
+
+type TimeResult<T> = result::Result<T, TimeRangeError>;
 
 /// An instant in monotonic time as provided by a `CLOCK_MONOTONIC` like clock
 ///
-/// Internally, this uses microsecond (micros) sized values to track, giving 584942417355.07202148
-/// years until overflow. Internally, systemd uses the same layout for it's time values.
+/// Internally, this uses microsecond-sized values, giving approximately 584,554 years until
+/// overflow. Systemd uses the same layout for its time values.
 #[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Clone, Copy)]
 pub struct MonotonicTime {
     micros: u64,
@@ -47,9 +74,22 @@ macro_rules! time_math_impl {
                 self.micros
             }
 
+            /// Create a timestamp from milliseconds.
+            ///
+            /// # Panics
+            ///
+            /// Panics if the value cannot be represented as microseconds in a `u64`.
             pub const fn from_millis(millis: u64) -> Self {
                 Self {
                     micros: millis_to_micros(millis),
+                }
+            }
+
+            /// Create a timestamp from milliseconds, returning `None` if it is out of range.
+            pub const fn checked_from_millis(millis: u64) -> Option<Self> {
+                match checked_millis_to_micros(millis) {
+                    Some(micros) => Some(Self { micros }),
+                    None => None,
                 }
             }
 
@@ -58,13 +98,30 @@ macro_rules! time_math_impl {
                     micros: seconds_to_micros(seconds as u64),
                 }
             }
+
+            /// Add a duration, returning `None` if the result is out of range.
+            pub const fn checked_add(self, duration: Duration) -> Option<Self> {
+                match self.micros.checked_add(duration.micros) {
+                    Some(micros) => Some(Self { micros }),
+                    None => None,
+                }
+            }
+
+            /// Return the elapsed duration, or `None` if `earlier` is later than `self`.
+            pub const fn checked_duration_since(self, earlier: Self) -> Option<Duration> {
+                match self.micros.checked_sub(earlier.micros) {
+                    Some(micros) => Some(Duration::from_micros(micros)),
+                    None => None,
+                }
+            }
         }
 
         impl Sub for $time_type {
             type Output = Duration;
 
             fn sub(self, rhs: Self) -> Self::Output {
-                Duration::from_micros(self.micros - rhs.micros)
+                self.checked_duration_since(rhs)
+                    .expect("cannot subtract a later timestamp")
             }
         }
 
@@ -72,10 +129,10 @@ macro_rules! time_math_impl {
             type Output = Self;
 
             fn add(self, other: time::Duration) -> Self {
-                let mo: u64 = other.as_micros().try_into().unwrap();
-                Self {
-                    micros: self.micros + mo,
-                }
+                let micros =
+                    micros_from_duration(other).expect("duration does not fit in microseconds");
+                self.checked_add(Duration::from_micros(micros))
+                    .expect("timestamp addition overflowed")
             }
         }
 
@@ -83,9 +140,8 @@ macro_rules! time_math_impl {
             type Output = Self;
 
             fn add(self, other: Duration) -> Self {
-                Self {
-                    micros: self.micros + other.micros,
-                }
+                self.checked_add(other)
+                    .expect("timestamp addition overflowed")
             }
         }
     };
@@ -100,19 +156,70 @@ pub struct Duration {
 }
 
 impl Duration {
+    /// A duration of zero microseconds.
+    pub const ZERO: Self = Self { micros: 0 };
+
+    /// Create a duration from microseconds.
     pub const fn from_micros(micros: u64) -> Self {
         Duration { micros }
     }
 
+    /// Create a duration from seconds.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the value cannot be represented as microseconds in a `u64`.
     pub const fn from_seconds(seconds: u64) -> Self {
         Duration {
             micros: seconds_to_micros(seconds),
         }
     }
 
+    /// Create a duration from seconds, returning `None` if it is out of range.
+    pub const fn checked_from_seconds(seconds: u64) -> Option<Self> {
+        match checked_seconds_to_micros(seconds) {
+            Some(micros) => Some(Self { micros }),
+            None => None,
+        }
+    }
+
+    /// Create a duration from milliseconds.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the value cannot be represented as microseconds in a `u64`.
     pub const fn from_milliseconds(millis: u64) -> Self {
         Duration {
             micros: millis_to_micros(millis),
+        }
+    }
+
+    /// Create a duration from milliseconds, returning `None` if it is out of range.
+    pub const fn checked_from_milliseconds(millis: u64) -> Option<Self> {
+        match checked_millis_to_micros(millis) {
+            Some(micros) => Some(Self { micros }),
+            None => None,
+        }
+    }
+
+    /// Return the entire duration in microseconds.
+    pub const fn as_micros(&self) -> u64 {
+        self.micros
+    }
+
+    /// Add two durations, returning `None` if the result is out of range.
+    pub const fn checked_add(self, rhs: Self) -> Option<Self> {
+        match self.micros.checked_add(rhs.micros) {
+            Some(micros) => Some(Self { micros }),
+            None => None,
+        }
+    }
+
+    /// Subtract two durations, returning `None` if `rhs` is greater than `self`.
+    pub const fn checked_sub(self, rhs: Self) -> Option<Self> {
+        match self.micros.checked_sub(rhs.micros) {
+            Some(micros) => Some(Self { micros }),
+            None => None,
         }
     }
 }
@@ -120,9 +227,7 @@ impl Duration {
 impl Add for Duration {
     type Output = Self;
     fn add(self, rhs: Self) -> Self::Output {
-        Self {
-            micros: self.micros + rhs.micros,
-        }
+        self.checked_add(rhs).expect("duration addition overflowed")
     }
 }
 
@@ -130,22 +235,20 @@ impl Sub for Duration {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        Self {
-            micros: self.micros - rhs.micros,
-        }
+        self.checked_sub(rhs)
+            .expect("duration subtraction underflowed")
     }
 }
 
-// TODO: make this `const` once duration_consts_2 is stable
-fn duration_from_micros(micros: u64) -> time::Duration {
+const fn duration_from_micros(micros: u64) -> time::Duration {
     let secs = micros / 1_000_000;
     let sub_micros = (micros % 1_000_000) as u32;
     let sub_nsec = sub_micros * 1000;
     time::Duration::new(secs, sub_nsec)
 }
 
-const fn micros_from_duration(duration: time::Duration) -> u64 {
-    duration.as_secs() * 1_000_000 + duration.subsec_micros() as u64
+fn micros_from_duration(duration: time::Duration) -> TimeResult<u64> {
+    duration.as_micros().try_into().map_err(|_| TimeRangeError)
 }
 
 impl MonotonicTime {
@@ -163,7 +266,19 @@ impl MonotonicTime {
     /// Sometimes, due to the lack of a way to generate a `std::time::Instant` from a numeric
     /// value, other code may use a `Duration` to contain a timestamp.  In that case, you should
     /// use this function to obtain a `MonotonicTime` for the timestamp within the `Duration`
+    ///
+    /// # Panics
+    ///
+    /// Panics if the duration cannot be represented in microseconds in a `u64`.
     pub fn from_core_duration(ctd: core::time::Duration) -> Self {
-        Self::from_micros(micros_from_duration(ctd))
+        Self::try_from(ctd).expect("duration does not fit in microseconds")
+    }
+}
+
+impl TryFrom<time::Duration> for MonotonicTime {
+    type Error = TimeRangeError;
+
+    fn try_from(duration: time::Duration) -> TimeResult<Self> {
+        Ok(Self::from_micros(micros_from_duration(duration)?))
     }
 }

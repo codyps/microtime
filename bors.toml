@@ -1,6 +1,0 @@
-status = [
-	"Build and test (beta)",
-	"check",
-]
-cut_body_after = "---"
-delete_merged_branches = true
