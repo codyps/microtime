@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0](https://github.com/codyps/microtime/compare/microtime-0.3.0...microtime-0.4.0) - 2026-08-26
+
+### Added
+
+- [**breaking**] harden time operations and automate releases
+
+### Other
+
+- Update changelog format and section headers
+- cleanup changelog
+- main rename
+
 ### Added
 
 - Added checked constructors and arithmetic methods for values that may exceed the
