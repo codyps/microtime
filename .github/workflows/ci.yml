@@ -32,6 +32,10 @@ jobs:
         timeout-minutes: 5
         run: rustup toolchain install stable --profile minimal --component clippy,rustfmt
 
+      - name: Test automatic release policy
+        timeout-minutes: 1
+        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py'
+
       - name: Check formatting
         run: cargo fmt --all -- --check
 
