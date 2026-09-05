@@ -22,11 +22,14 @@ jobs:
   quality:
     name: Quality
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - name: Checkout repository
+        timeout-minutes: 3
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install stable Rust
+        timeout-minutes: 5
         run: rustup toolchain install stable --profile minimal --component clippy,rustfmt
 
       - name: Check formatting
@@ -49,6 +52,7 @@ jobs:
   test:
     name: Test (${{ matrix.toolchain }})
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -57,9 +61,11 @@ jobs:
           - beta
     steps:
       - name: Checkout repository
+        timeout-minutes: 3
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Rust ${{ matrix.toolchain }}
+        timeout-minutes: 5
         run: rustup toolchain install ${{ matrix.toolchain }} --profile minimal
 
       - name: Test with all features
